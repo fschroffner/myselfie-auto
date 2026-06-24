@@ -16,3 +16,13 @@ beator
 beator-32
 rotor
 rotor-32
+
+# LaTeX build files
+*.aux
+*.log
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.vrb
+*.bbl
+*.blg

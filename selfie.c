@@ -474,6 +474,7 @@ uint64_t SYM_INT      = 30; // int
 uint64_t SYM_CHAR     = 31; // char
 uint64_t SYM_UNSIGNED = 32; // unsigned
 uint64_t SYM_CONST    = 33; // const
+uint64_t SYM_AUTO     = 34; // auto
 
 uint64_t* SYMBOLS; // strings representing symbols
 
@@ -512,7 +513,7 @@ uint64_t source_fd   = 0; // file descriptor of open source file
 // ------------------------- INITIALIZATION ------------------------
 
 void init_scanner () {
-  SYMBOLS = smalloc((SYM_CONST + 1) * sizeof(uint64_t*));
+  SYMBOLS = smalloc((SYM_AUTO + 1) * sizeof(uint64_t*));
 
   *(SYMBOLS + SYM_INTEGER)      = (uint64_t) "integer";
   *(SYMBOLS + SYM_CHARACTER)    = (uint64_t) "character";
@@ -549,6 +550,7 @@ void init_scanner () {
   *(SYMBOLS + SYM_CHAR)     = (uint64_t) "char";
   *(SYMBOLS + SYM_UNSIGNED) = (uint64_t) "unsigned";
   *(SYMBOLS + SYM_CONST)    = (uint64_t) "const";
+  *(SYMBOLS + SYM_AUTO)     = (uint64_t) "auto";
 
   character = CHAR_EOF;
   symbol    = SYM_EOF;
@@ -715,6 +717,7 @@ uint64_t compile_cast(uint64_t type); // returns cast type
 uint64_t compile_value(); // returns value
 
 void compile_statement();
+void compile_auto_declaration();
 
 uint64_t load_upper_value(uint64_t reg, uint64_t value);
 uint64_t load_upper_address(uint64_t* entry);
@@ -772,6 +775,8 @@ uint64_t return_type = 0; // return type of currently parsed procedure
 uint64_t number_of_global_variables = 0;
 uint64_t number_of_procedures       = 0;
 uint64_t number_of_string_literals  = 0;
+
+uint64_t number_of_auto_variable_bytes = 0; // cumulative stack bytes (declared locals + auto vars) in current procedure
 
 uint64_t number_of_assignments = 0;
 uint64_t number_of_while       = 0;
@@ -3764,6 +3769,8 @@ uint64_t identifier_or_keyword() {
   else if (identifier_string_match(SYM_CONST))
     // selfie bootstraps const to uint64_t!
     return SYM_UINT64;
+  else if (identifier_string_match(SYM_AUTO))
+    return SYM_AUTO;
   else
     return SYM_IDENTIFIER;
 }
@@ -4383,6 +4390,8 @@ uint64_t is_neither_type_nor_void() {
 uint64_t is_not_statement() {
   if (symbol == SYM_ASTERISK)
     return 0;
+  else if (symbol == SYM_AUTO)
+    return 0;
   else if (symbol == SYM_IDENTIFIER)
     return 0;
   else if (symbol == SYM_IF)
@@ -4698,6 +4707,49 @@ uint64_t compile_value() {
   }
 }
 
+void compile_auto_declaration() {
+  char* var_name;
+  uint64_t inferred_type;
+
+  // consume 'auto'
+  get_symbol();
+
+  if (symbol != SYM_IDENTIFIER) {
+    syntax_error_expected_symbol(SYM_IDENTIFIER);
+    return;
+  }
+
+  var_name = identifier;
+  get_symbol();
+
+  get_expected_symbol(SYM_ASSIGN);
+
+  // compile RHS expression; result ends up in current_temporary()
+  inferred_type = compile_expression();
+
+  // auto must bind a value; a void expression (e.g. a void procedure call)
+  // yields no usable type to infer
+  if (inferred_type == VOID_T)
+    syntax_error_message("auto cannot infer a type from a void expression");
+
+  // lazy stack allocation: push one word onto stack
+  emit_addi(REG_SP, REG_SP, -WORDSIZE);
+
+  // store the RHS value to the new stack slot
+  emit_store(REG_SP, 0, current_temporary());
+
+  tfree(1);
+
+  // track cumulative bytes used by auto vars (needed for epilogue)
+  number_of_auto_variable_bytes = number_of_auto_variable_bytes + WORDSIZE;
+
+  // FP (REG_S0) was set at prologue time; auto var n is at FP - n*WORDSIZE
+  create_symbol_table_entry(LOCAL_TABLE, var_name,
+    line_number, VARIABLE, inferred_type, 0, -number_of_auto_variable_bytes);
+
+  get_expected_symbol(SYM_SEMICOLON);
+}
+
 void compile_statement() {
   char* variable_or_procedure;
 
@@ -4713,7 +4765,9 @@ void compile_statement() {
       get_symbol();
   }
 
-  if (symbol == SYM_ASTERISK) {
+  if (symbol == SYM_AUTO) {
+    compile_auto_declaration();
+  } else if (symbol == SYM_ASTERISK) {
     // assignment: "*" ...
     compile_assignment((char*) 0);
 
@@ -5784,6 +5838,10 @@ void compile_procedure(char* procedure, uint64_t type) {
       get_expected_symbol(SYM_SEMICOLON);
     }
 
+    // auto variables are stack-allocated lazily on top of the declared
+    // locals; start tracking the frame size at the declared-local bytes
+    number_of_auto_variable_bytes = number_of_local_variable_bytes;
+
     // try parsing statements in procedure body
 
     procedure_prologue(number_of_local_variable_bytes);
@@ -5812,11 +5870,13 @@ void compile_procedure(char* procedure, uint64_t type) {
 
     return_jumps = 0;
 
+    // pass the full frame size (declared locals + auto vars) so the
+    // epilogue resets SP to FP whenever any locals were allocated
     if (is_variadic)
-      procedure_epilogue(number_of_local_variable_bytes,
+      procedure_epilogue(number_of_auto_variable_bytes,
         -number_of_formal_parameters * WORDSIZE);
     else
-      procedure_epilogue(number_of_local_variable_bytes,
+      procedure_epilogue(number_of_auto_variable_bytes,
         number_of_formal_parameters * WORDSIZE);
 
     // return

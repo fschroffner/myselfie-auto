@@ -1,0 +1,373 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usepackage{caption}
+\usepackage{abstract}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{graphicx}
+\usepackage{float}
+
+\usepackage{mathptmx}   % Times-compatible serif (~ Liberation Serif)
+\usepackage{helvet}     % Helvetica-compatible sans (~ Liberation Sans)
+\usepackage{courier}    % monospace (~ DejaVu Sans Mono)
+
+% Colors
+\definecolor{codebg}{RGB}{244,248,240}
+\definecolor{codegreen}{RGB}{26,85,26}
+\definecolor{headcolor}{RGB}{46,64,87}
+\definecolor{sectioncolor}{RGB}{26,107,138}
+\definecolor{keywordcolor}{RGB}{0,70,140}
+\definecolor{commentcolor}{RGB}{100,100,100}
+\definecolor{stringcolor}{RGB}{150,0,0}
+
+% Hyperref setup
+\hypersetup{
+  colorlinks=true,
+  linkcolor=sectioncolor,
+  citecolor=sectioncolor,
+  urlcolor=sectioncolor,
+}
+
+% C* with the auto keyword
+\lstdefinelanguage{Cstar}{
+  keywords={auto, if, else, while, return, void, uint64_t, char, malloc, sizeof},
+  keywordstyle=\bfseries\color{keywordcolor},
+  comment=[l]{//},
+  commentstyle=\itshape\color{commentcolor},
+  stringstyle=\color{stringcolor},
+  morestring=[b]",
+  sensitive=true
+}
+
+\lstset{
+  language=Cstar,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{lightgray},
+  xleftmargin=10pt,
+  xrightmargin=10pt,
+  framexleftmargin=6pt,
+  framexrightmargin=6pt,
+  framextopmargin=4pt,
+  framexbottommargin=4pt,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+  aboveskip=6pt,
+  belowskip=6pt,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=6pt,
+}
+
+\titleformat{\section}{\large\bfseries\color{headcolor}}{{\thesection}}{1em}{}[\vspace{-4pt}\rule{\textwidth}{0.4pt}]
+\titleformat{\subsection}{\normalsize\bfseries\color{sectioncolor}}{\thesubsection}{1em}{}
+
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+% ── Title ─────────────────────────────────────────────────────────────────────
+\begin{center}
+  {\LARGE \textbf{\textcolor{headcolor}{\texttt{auto} Type Inference in a Single-Pass Compiler}}}\\[0.4cm]
+  {\large Adding initialiser-driven inference to Selfie without an AST}\\[0.6cm]
+  {\normalsize
+    Florian Schroffner\\
+    Department of Computer Sciences, University of Salzburg\\
+    Advanced Systems Engineering\\
+    Supervisor: Prof.\ Christoph Kirsch\\[0.2cm]
+    \today
+  }
+\end{center}
+
+\vspace{0.3cm}
+\hrule height 1pt
+\vspace{0.5cm}
+
+% ── Abstract ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+\noindent
+This paper extends the Selfie/C* compiler with a single keyword, \texttt{auto}, for initialiser-driven local type inference --- added \emph{without} changing Selfie's single-pass architecture. The central observation is that Selfie's single-pass parser already performs lightweight type tracking: every expression-compiling function returns the type (\texttt{uint64\_t} or \texttt{uint64\_t*}) of the value it just produced. The \texttt{auto} feature simply captures the type this existing machinery computes for the initialiser and records it in the symbol table. No abstract syntax tree, no separate type-checking pass, and no change to the code generator are required. The implementation touches three functions in \texttt{selfie.c}. The extended compiler still self-compiles to a 43\,728-instruction RISC-U binary and passes the project autograder, including a dedicated \texttt{auto}-type-inference suite with positive (compile-and-run) and negative (must-reject) tests. The project demonstrates that a feature usually associated with multi-pass compilers does not, in its initialiser-driven form, require multi-pass machinery.
+\end{abstract}
+
+\hrule height 0.4pt
+\vspace{0.5cm}
+
+% ── 1. Introduction ───────────────────────────────────────────────────────────
+\section{Introduction}
+
+Type inference — the ability of a compiler to deduce the type of a variable from its initialiser — is a feature taken for granted in modern languages. C++ offers \texttt{auto}, Go provides \texttt{:=}, and Rust infers types across entire functions. A common assumption is that adding such inference to a compiler requires a multi-pass pipeline with an explicit Abstract Syntax Tree (AST) and a dedicated semantic phase that can reason about types before code generation.
+
+This paper shows that the assumption is unnecessary for \emph{initialiser-driven} inference. Selfie/C*~\cite{selfie}, the basis of this work, interleaves parsing and code emission in a single pass and has only two types (\texttt{uint64\_t} and \texttt{uint64\_t*}). Crucially, it already performs lightweight type tracking: every expression-compiling function \emph{returns} the type of the value it has just compiled. The type needed to give an \texttt{auto} variable a concrete type is therefore already computed at the moment its initialiser is parsed.
+
+This work extends Selfie with the \texttt{auto} keyword for local variables. It answers three research questions:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{RQ\arabic*.}]
+  \item Can initialiser-driven \texttt{auto} inference be added to a single-pass compiler without introducing an AST or a separate semantic pass?
+  \item What is the smallest set of changes to \texttt{selfie.c} that implements \texttt{auto} correctly, including stack allocation and procedure cleanup?
+  \item Which inference patterns does the feature cover, and how does it compare to \texttt{auto}/\texttt{var}/\texttt{:=} in mainstream languages?
+\end{enumerate}
+
+The remainder of this paper is structured as follows. Section~\ref{sec:background} reviews Selfie/C*. Section~\ref{sec:language} specifies the \texttt{auto} extension. Section~\ref{sec:architecture} shows how the single pass already supplies the needed type information. Section~\ref{sec:implementation} details the three-function implementation. Section~\ref{sec:evaluation} evaluates the result through self-compilation and the autograder. Section~\ref{sec:conclusion} concludes.
+
+% ── 2. Background ─────────────────────────────────────────────────────────────
+\section{Background}
+\label{sec:background}
+
+\subsection{Selfie and C*}
+
+Selfie~\cite{selfie} is a self-referential system developed at the University of Salzburg. It comprises a compiler for the C* language, a RISC-U emulator (mipster), and a hypervisor (hypster), all written in approximately 10\,000 lines of C. C* is a strict subset of C with only two types, no floating-point arithmetic, and no separate compilation.
+
+The Selfie compiler is a single-pass recursive-descent parser: as tokens are consumed, RISC-U machine code is emitted immediately. There is no explicit AST, so there is no obvious place for a \emph{whole-program} semantic phase. It does, however, maintain enough type information locally to type-check assignments and arithmetic: each expression-compiling function returns a type tag (\texttt{UINT64\_T} or \texttt{UINT64STAR\_T}) describing the value it just emitted. This local, already-present type tracking is exactly what \texttt{auto} reuses.
+
+\subsection{RISC-U}
+
+RISC-U is a minimal subset of the RISC-V ISA defined for Selfie. It consists of 14 instructions: \texttt{lui}, \texttt{addi}, \texttt{add}, \texttt{sub}, \texttt{mul}, \texttt{divu}, \texttt{remu}, \texttt{sltu}, \texttt{ld}, \texttt{sd}, \texttt{beq}, \texttt{jal}, \texttt{jalr}, and \texttt{ecall}. Its simplicity makes it an ideal compilation target for educational compilers: the full ISA fits on one page, yet it is sufficient for Turing-complete programs.
+
+% ── 3. The auto Extension ─────────────────────────────────────────────────────
+\section{The \texttt{auto} Extension}
+\label{sec:language}
+
+The \texttt{auto} extension keeps C* a strict subset: every valid C* program still compiles unchanged. The only addition is the \texttt{auto} keyword for local variables whose type is inferred from the initialiser. No new type keywords are introduced.
+
+\subsection{The Two Inferable Types}
+
+\texttt{auto} infers one of Selfie's two existing types. It adds no types, widths, or conversions; the inferred type is precisely what Selfie's expression compiler already produces for the initialiser.
+
+\begin{table}[H]
+\centering
+\caption{The two types \texttt{auto} can infer}
+\label{tab:types}
+\begin{tabular}{llll}
+\toprule
+\textbf{Type} & \textbf{Internal tag} & \textbf{Inference Example} & \textbf{Inferred Type} \\
+\midrule
+\texttt{uint64\_t}  & \texttt{UINT64\_T}     & \texttt{auto y = 1;}   & \texttt{uint64\_t}  \\
+\texttt{uint64\_t*} & \texttt{UINT64STAR\_T} & \texttt{auto p = malloc(8);} & \texttt{uint64\_t*} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Because there is no second numeric type, there is no promotion rule and no implicit conversion to specify: the type of an \texttt{auto} variable is identical to the type Selfie would assign to the right-hand side of an ordinary assignment.
+
+\subsection{Pointer Rules}
+
+The pointer rules are inherited verbatim from C*; \texttt{auto} merely reports their result.
+
+\begin{table}[H]
+\centering
+\caption{Pointer type rules (unchanged from Selfie)}
+\label{tab:ptrs}
+\begin{tabular}{lll}
+\toprule
+\textbf{Expression}        & \textbf{Condition}                                    & \textbf{Result Type} \\
+\midrule
+\texttt{auto v = *p}       & \texttt{p : uint64\_t*}                               & \texttt{uint64\_t}   \\
+\texttt{auto q = p + n}    & \texttt{p : uint64\_t*}, \texttt{n : uint64\_t}       & \texttt{uint64\_t*}  \\
+\texttt{auto d = p - q}    & \texttt{p, q : uint64\_t*}                            & \texttt{uint64\_t}   \\
+\texttt{auto r = malloc(n)}& \texttt{n : uint64\_t}                                & \texttt{uint64\_t*}  \\
+\texttt{p + q}             & \texttt{p, q : uint64\_t*}                            & \textbf{Error}       \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Example Program}
+
+\texttt{auto} declarations are ordinary statements inside any procedure body, including \texttt{main}.
+
+\begin{lstlisting}[caption={A complete program using \texttt{auto}}]
+uint64_t factorial(uint64_t n) {
+    if (n == 0) return 1;
+    return n * factorial(n - 1);
+}
+
+uint64_t main() {
+    auto n   = 5;             // uint64_t
+    auto res = factorial(n);  // uint64_t  -- callee return type
+    auto p   = malloc(8);     // uint64_t* -- malloc result
+    *p = res;
+    auto v   = *p;            // uint64_t  -- dereference
+    return v - 120;           // 0 on success
+}
+\end{lstlisting}
+
+\subsection{Restrictions From the Single Pass}
+
+The properties that keep inference simple are not enforced by extra checks; they follow from the single-pass design.
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[\textbf{(a) Direct initialiser only.}]
+    The type of an \texttt{auto} variable is exactly the type of its own initialiser. Types never flow back from later uses, so no constraint solving is ever required.
+
+  \item[\textbf{(b) No type hierarchy.}]
+    Inference yields one of two types; there is no promotion lattice to search, and mixed-type arithmetic is governed by Selfie's pre-existing rules.
+
+  \item[\textbf{(c) No circular or forward \texttt{auto}.}]
+    In a single pass an identifier must be declared before use, so a variable cannot appear in its own or a not-yet-declared variable's initialiser. Such cases are rejected automatically as undeclared-identifier errors.
+\end{description}
+
+% ── 4. Architecture ───────────────────────────────────────────────────────────
+\section{Compiler Architecture}
+\label{sec:architecture}
+
+Selfie's single-pass design — scanner, parser, and code emitter advancing in lock-step — is left unchanged. The pipeline is:
+
+\vspace{6pt}
+\begin{center}
+\texttt{Scanner $\;\longrightarrow\;$ Recursive-descent parser + code emitter $\;\longrightarrow\;$ RISC-U}
+\end{center}
+\vspace{6pt}
+
+There is no AST; the ``tree'' exists only implicitly in the call stack of the recursive-descent parser. The enabling observation is that Selfie's expression-compiling functions already \emph{return a type}. As \texttt{compile\_expression()} (and the precedence levels below it, \texttt{compile\_arithmetic()}, \texttt{compile\_term()}, \texttt{compile\_factor()}) emit code that computes a value into a temporary register, each returns a \texttt{uint64\_t} type tag describing that value. A dereference turns \texttt{UINT64STAR\_T} into \texttt{UINT64\_T}; \texttt{malloc} yields \texttt{UINT64STAR\_T}; a string literal yields \texttt{UINT64STAR\_T}; a call yields the callee's declared return type; pointer arithmetic preserves \texttt{UINT64STAR\_T}.
+
+By the time the parser finishes compiling an initialiser, the concrete type of that expression is sitting in the return value of \texttt{compile\_expression()} --- precisely the information an \texttt{auto} declaration needs. The \texttt{auto} extension does not compute types; it reads back the type Selfie already produced. This is why no AST and no separate pass are required.
+
+% ── 5. Implementation ─────────────────────────────────────────────────────────
+\section{Implementation}
+\label{sec:implementation}
+
+The feature touches three functions in \texttt{selfie.c}, plus the one-keyword scanner addition (\texttt{SYM\_AUTO}).
+
+\subsection{Parsing an \texttt{auto} Declaration}
+
+The new function \texttt{compile\_auto\_declaration()} parses \texttt{auto identifier = expression ;}, takes the inferred type from the return value of \texttt{compile\_expression()}, allocates a stack slot, and records the variable in the local symbol table.
+
+\begin{lstlisting}[language=C, caption={The core of the feature}]
+void compile_auto_declaration() {
+  char* var_name; uint64_t inferred_type;
+  get_symbol();                       // consume 'auto'
+  var_name = identifier;
+  get_symbol();                       // consume identifier
+  get_expected_symbol(SYM_ASSIGN);    // consume '='
+
+  inferred_type = compile_expression(); // type Selfie already returns
+
+  emit_addi(REG_SP, REG_SP, -WORDSIZE); // lazy stack allocation
+  emit_store(REG_SP, 0, current_temporary());
+  tfree(1);
+
+  number_of_auto_variable_bytes = number_of_auto_variable_bytes + WORDSIZE;
+  create_symbol_table_entry(LOCAL_TABLE, var_name, line_number,
+    VARIABLE, inferred_type, 0, -number_of_auto_variable_bytes);
+
+  get_expected_symbol(SYM_SEMICOLON);
+}
+\end{lstlisting}
+
+Allocation is \emph{lazy}: because the number of \texttt{auto} variables is not known in advance in a single pass, each declaration pushes its own word onto the stack as it is compiled, rather than reserving space in the prologue.
+
+\subsection{Statement Dispatch and Frame Size}
+
+\texttt{compile\_statement()} gains one branch so that an \texttt{auto} declaration is accepted wherever a statement is allowed. The only change outside the new function is in \texttt{compile\_procedure()}: the running counter \texttt{number\_of\_auto\_variable\_bytes} is initialised to the declared-locals size, and the combined frame size is passed to the epilogue. Because Selfie's epilogue restores \texttt{SP} directly from the frame pointer whenever the frame is non-empty, the exact number of pushed \texttt{auto} words never has to be tracked for correctness.
+
+\subsection{Error Handling for Free}
+
+Because inference reuses Selfie's expression compiler, most error cases are rejected by Selfie's existing diagnostics, with no new code; only the void initialiser needs a single explicit check:
+
+\begin{itemize}
+  \item \texttt{auto x = undefined;} --- the identifier is in no symbol table, so Selfie reports an undeclared identifier.
+  \item \texttt{auto x = y;} where \texttt{y} is declared later --- in a single pass \texttt{y} is not yet visible; this is what makes forward and circular \texttt{auto} impossible.
+  \item \texttt{auto e = p + q;} where both are pointers --- Selfie already rejects pointer\,$+$\,pointer.
+  \item \texttt{auto x = f();} where \texttt{f} returns \texttt{void} --- there is no value to bind, so \texttt{auto} rejects the void initialiser explicitly.
+\end{itemize}
+
+% ── 7. Evaluation ─────────────────────────────────────────────────────────────
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Self-Compilation}
+
+The strongest correctness criterion for a self-hosting compiler is that it compile its own source. Because \texttt{selfie.c} is plain C* (it does not use \texttt{auto}), the extended compiler still self-compiles unchanged: \texttt{./selfie -c selfie.c -o selfie.m} produces a RISC-U binary of \textbf{43\,728} 64-bit instructions and \textbf{14\,240} bytes of data (a 189\,152-byte loaded image), which executes correctly under mipster. Adding \texttt{auto} grows the compiler by only the handful of instructions needed for the new function and statement branch.
+
+\subsection{Autograder Results}
+
+Two autograder targets are relevant. The \texttt{selfie-compile} target verifies that self-compilation still succeeds (all three checks pass --- \texttt{make selfie}, warning-free \texttt{./selfie -c selfie.c}, and \texttt{.m} binary creation). The dedicated \texttt{auto-type-inference} target exercises the feature directly:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Category} & \textbf{Programs} & \textbf{Result} \\
+\midrule
+Positive (compile + run, exit 0) & \texttt{auto-fint}, \texttt{auto-fint-pointer}, \texttt{auto-fstring}, & \checkmark\ all pass \\
+                                 & \texttt{auto-deref}, \texttt{auto-comparison}, \texttt{auto-nested}, & \\
+                                 & \texttt{auto-function-return}, \texttt{auto-pointer-arith}, \dots & \\
+Negative (must reject)           & \texttt{invalid-undefined-var}, \texttt{invalid-circular-dep}, & \checkmark\ all rejected \\
+                                 & \texttt{invalid-fstring-add} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each positive program both compiles \emph{and} returns exit code 0, so an incorrect inference would change the result; the suite therefore validates the inferred type, not merely acceptance of the syntax.
+
+\subsection{Comparison with Selfie}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Property}         & \textbf{Selfie/C*}       & \textbf{+ \texttt{auto}} \\
+\midrule
+Architecture              & Single-pass              & Single-pass (unchanged) \\
+Explicit AST              & No                       & No           \\
+Separate semantic pass    & No                       & No           \\
+Type system               & 2 types                  & 2 types      \\
+\texttt{auto} inference   & No                       & Yes          \\
+Functions changed         & ---                      & 3            \\
+Self-compilation          & Yes                      & Yes          \\
+Target ISA                & RISC-U                   & RISC-U       \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ── 8. Conclusion ─────────────────────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+
+This work demonstrates that a feature usually associated with multi-pass compilers — type inference — does not, in its initialiser-driven form, require multi-pass machinery. The type \texttt{auto} needs is a by-product of code generation that Selfie's single pass already computes and discards; capturing it in three functions is enough, with no AST, no separate semantic pass, and no change to the code generator.
+
+The key insight is that decidable, initialiser-driven inference is \emph{already implied} by a compiler whose expression functions return types. The restrictions on the feature — direct initialiser only, two types, no forward references — are not weaknesses but the precise boundary of what a single pass makes available, and the natural error cases fall out of Selfie's existing diagnostics for free.
+
+Future work could give \texttt{auto} more to infer by adding a type to Selfie, provide a targeted diagnostic for circular dependencies, or extend \texttt{auto} to return types and global declarations --- each a small, local extension rather than an architectural change.
+
+% ── References ────────────────────────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{selfie}
+  Kirsch, C.\ M.\ et al.
+  \textit{Selfie: Reflections on Self-referential Computer Systems}.
+  Onward! 2017, ACM, 2017.
+
+\bibitem{hindleymilner}
+  Milner, R.
+  \textit{A Theory of Type Polymorphism in Programming}.
+  Journal of Computer and System Sciences, 17(3):348--375, 1978.
+
+\bibitem{dragonbook}
+  Aho, A.\ V., Lam, M.\ S., Sethi, R., Ullman, J.\ D.
+  \textit{Compilers: Principles, Techniques, and Tools} (2nd ed.).
+  Pearson, 2006.
+
+\bibitem{riscv}
+  Waterman, A., Asanovi\'{c}, K.\ (eds.).
+  \textit{The RISC-V Instruction Set Manual, Volume I: User-Level ISA}.
+  RISC-V Foundation, 2019.
+
+\end{thebibliography}
+
+\end{document}

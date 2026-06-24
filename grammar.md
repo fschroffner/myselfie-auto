@@ -6,9 +6,25 @@ selfie.cs.uni-salzburg.at
 
 This is the grammar of the C Star (C\*) programming language.
 
-C\* is a tiny subset of the programming language C. C\* features global variable declarations with optional initialization as well as procedures with parameters and local variables. C\* has five statements (assignment, while loop, if-then-else, procedure call, and return) and standard arithmetic (`+`, `-`, `*`, `/`, `%`) and comparison (`==`, `!=`, `<`, `>`, `<=`, `>=`) operators over variables and procedure calls as well as integer, character, and string literals. C\* includes the unary `*` operator for dereferencing pointers hence the name but excludes data types other than `uint64_t` and `uint64_t*`, bitwise and Boolean operators, and many other features. The C\* grammar is LL(1) with 7 keywords and 22 symbols. Whitespace as well as single-line (`//`) and multi-line (`/*` to `*/`) comments are ignored.
+C\* is a tiny subset of the programming language C. C\* features global variable declarations with optional initialization as well as procedures with parameters and local variables. C\* has five statements (assignment, while loop, if-then-else, procedure call, and return) and standard arithmetic (`+`, `-`, `*`, `/`, `%`) and comparison (`==`, `!=`, `<`, `>`, `<=`, `>=`) operators over variables and procedure calls as well as integer, character, and string literals. C\* includes the unary `*` operator for dereferencing pointers hence the name but excludes data types other than `uint64_t` and `uint64_t*`, bitwise and Boolean operators, and many other features. The base C\* grammar is LL(1) with 7 keywords and 22 symbols. Whitespace as well as single-line (`//`) and multi-line (`/*` to `*/`) comments are ignored.
 
 C\* Keywords: `uint64_t`, `void`, `sizeof`, `if`, `else`, `while`, `return`
+
+## Extension: `auto` type inference
+
+This repository extends C\* with a single additional keyword, `auto`, for local
+variable declarations whose type is inferred from the initialiser. The inferred
+type is always one of the two existing C\* types (`uint64_t` or `uint64_t*`); no
+new types are introduced. An `auto` declaration is a statement and may appear
+anywhere a statement is allowed inside a procedure body.
+
+An `auto` declaration always requires an initialiser: there is no `auto x;`
+form, because there would be nothing to infer from. The initialiser must
+produce a value, so it must have type `uint64_t` or `uint64_t*`; a `void`
+expression (such as a call to a `void` procedure) is rejected, as there is no
+value type to bind.
+
+Extension keyword: `auto`
 
 C\* Symbols: `integer`, `character`, `string`, `identifier`, `,`, `;`, `(`, `)`, `{`, `}`, `+`, `-`, `*`, `/`, `%`, `=`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `...`
 
@@ -47,9 +63,12 @@ cast       = "(" type ")" .
 
 value      = integer | character .
 
-statement  = assignment ";" | if | while | call ";" | return ";" .
+statement  = assignment ";" | if | while | call ";" | return ";"
+           | auto_declaration ";" .
 
-assignment = ( [ "*" ] identifier | "*" "(" arithmetic ")" ) "=" expression .
+auto_declaration = "auto" identifier "=" expression .
+
+assignment = ( [ "*" ] identifier | "*" "(" expression ")" ) "=" expression .
 
 expression = arithmetic [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) arithmetic ] .
 

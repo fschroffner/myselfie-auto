@@ -56,6 +56,7 @@ def list_assignments_str(assignments: List[Assignment]) -> str:
     print_assignment_of_lecture('General', stream)
     print_assignment_of_lecture('Compiler', stream)
     print_assignment_of_lecture('Systems', stream)
+    print_assignment_of_lecture('Flo', stream)
 
     return stream.getvalue()
 
@@ -84,6 +85,7 @@ def print_dependency_tree(assignments: List[Assignment]):
     print_assignment_of_lecture('General', stream)
     print_assignment_of_lecture('Compiler', stream)
     print_assignment_of_lecture('Systems', stream)
+    print_assignment_of_lecture('Flo', stream)
 
     return stream.getvalue()
 

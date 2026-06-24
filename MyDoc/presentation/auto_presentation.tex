@@ -1,0 +1,177 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% Using pdfLaTeX with Latin Modern instead of XeLaTeX/LuaLaTeX + Fira;
+% silence metropolis's advisory engine warning.
+\usepackage{silence}
+\WarningFilter{beamerthememetropolis}{You need to compile}
+
+% Clean, minimal theme
+\usetheme{metropolis}
+\setbeamertemplate{navigation symbols}{}
+
+% ── Document metadata ─────────────────────────────────────────────────────────
+\title{Teaching Type Inference}
+\subtitle{Making \texttt{auto} tangible in Selfie}
+\author{Florian Schroffner}
+\institute{University of Salzburg}
+\date{\today}
+
+\begin{document}
+
+% ── Title ─────────────────────────────────────────────────────────────────────
+\begin{frame}[plain,shrink=10]
+  \titlepage
+\end{frame}
+
+% ── Slide 1: The teaching problem / hook ──────────────────────────────────────
+\begin{frame}{Everyone uses it. Nobody sees how.}
+  \begin{center}
+    \Large
+    \texttt{auto}\quad\texttt{var}\quad\texttt{:=}
+  \end{center}
+
+  \vfill
+
+  \begin{itemize}
+    \item In C++, Rust, Go
+    \item The type just appears
+    \item Taught as deep theory
+    \item Students never see it work
+  \end{itemize}
+
+  \vfill
+
+  \begin{center}
+    \alert{\Large How do you \emph{teach} it?}
+  \end{center}
+\end{frame}
+
+% ── Slide 2: Framing — auto in a compiler you can read ────────────────────────
+\begin{frame}{Shrink it until you can read it}
+  \begin{center}
+    \Large
+    \texttt{auto p = malloc(8);}\quad$\longrightarrow$\quad\texttt{p : pointer}
+  \end{center}
+
+  \vfill
+
+  \begin{itemize}
+    \item Selfie: a tiny compiler
+    \item Small enough to read
+    \item \texttt{auto}: type from initialiser
+  \end{itemize}
+
+  \vfill
+
+  \begin{center}
+    \alert{\Large But where does the type come from?}
+  \end{center}
+\end{frame}
+
+% ── Slide 3: The single grammar change ────────────────────────────────────────
+\begin{frame}{The whole grammar change}
+  \begin{center}
+    A statement can now also be an \texttt{auto} declaration:
+  \end{center}
+
+  \vfill
+
+  \begin{center}
+    \footnotesize
+    \begin{tabular}{r c l}
+      \texttt{statement} & \texttt{=} & \texttt{\dots\ | call ";" | return ";"} \\
+                         &            & \alert{\texttt{| auto\_declaration ";" .}} \\[1em]
+      \alert{\texttt{auto\_declaration}} & \alert{\texttt{=}}
+                         & \alert{\texttt{"auto" identifier "=" expression .}} \\
+    \end{tabular}
+  \end{center}
+
+  \vfill
+
+  \begin{itemize}
+    \item One new production
+    \item \texttt{expression} is reused
+    \item Initialiser required; \texttt{void} rejected
+  \end{itemize}
+\end{frame}
+
+% ── Slide 4: DEEP DIVE — the mechanism in one line ────────────────────────────
+\begin{frame}{The type is already there}
+  \begin{center}
+    \large
+    \texttt{auto p = malloc(8);}
+  \end{center}
+
+  \vfill
+
+  \begin{center}
+    \Large
+    \alert{\texttt{inferred\_type = compile\_expression();}}
+  \end{center}
+
+  \vfill
+
+  \begin{itemize}
+    \item Every expression returns its type
+    \item \texttt{auto} just keeps it
+    \item No new analysis
+  \end{itemize}
+
+  \vfill
+
+  \begin{center}
+    \alert{One line does the inference.}
+  \end{center}
+\end{frame}
+
+% ── Slide 5: How small it is (line count — keep for the professor) ─────────────
+\begin{frame}{And that is the whole feature}
+  \begin{center}
+    \begin{tabular}{l l r}
+      \textbf{Part} & \textbf{Language} & \textbf{Size} \\[0.4em]
+      \hline \\[-0.8em]
+      \texttt{auto} implementation & C* (\texttt{selfie.c}) & \textasciitilde55 lines, 3 functions \\
+      Test programs                & C*                     & 14 files, 136 lines \\
+      Autograder suite             & Python                 & 24 automated checks \\
+    \end{tabular}
+  \end{center}
+
+  \vfill
+
+  \begin{itemize}
+    \item One new function
+    \item No new pass, no AST
+    \item Compiles \emph{and} rejection tested
+  \end{itemize}
+
+  \vfill
+
+  \begin{center}
+    \alert{Small surface, fully tested.}
+  \end{center}
+\end{frame}
+
+% ── Slide 6: The value ────────────────────────────────────────────────────────
+\begin{frame}{Small enough to understand}
+  \begin{itemize}
+    \item A real feature, fully built
+    \item Readable end to end
+    \item The mechanism made visible
+  \end{itemize}
+
+  \vfill
+
+  \begin{center}
+    \Large
+    Type inference is not magic ---\\[0.3em]
+    it is the type the compiler\\
+    \alert{already had.}
+  \end{center}
+\end{frame}
+
+\end{document}

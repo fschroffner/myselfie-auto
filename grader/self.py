@@ -436,6 +436,60 @@ assignment_treiber_stack = Assignment('treiber-stack', 'Systems', 'treiber-stack
            REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-treiber-stack',
            check_treiber_stack, parent = assignment_threadsafe_malloc)
 
+def check_auto_type_inference() -> List[Check]:
+    return check_compilable('auto-fint.c',
+                            'auto with integer literal does compile') + \
+        check_mipster_execution('auto-fint.c', 0,
+                                'auto with integer literal has the right value') + \
+        check_compilable('auto-fint-pointer.c',
+                         'auto with malloc result does compile') + \
+        check_mipster_execution('auto-fint-pointer.c', 0,
+                                'auto with malloc result has the right value') + \
+        check_compilable('auto-fstring.c',
+                         'auto with string literal does compile') + \
+        check_mipster_execution('auto-fstring.c', 0,
+                                'auto with string literal executes correctly') + \
+        check_compilable('auto-comparison.c',
+                         'auto with comparison does compile') + \
+        check_mipster_execution('auto-comparison.c', 0,
+                                'auto with comparison has the right value') + \
+        check_compilable('auto-function-return.c',
+                         'auto with function return does compile') + \
+        check_mipster_execution('auto-function-return.c', 0,
+                                'auto with function return has the right value') + \
+        check_compilable('auto-pointer-arith.c',
+                         'auto with pointer arithmetic does compile') + \
+        check_mipster_execution('auto-pointer-arith.c', 0,
+                                'auto with pointer arithmetic has the right value') + \
+        check_compilable('proposal-example.c',
+                         'proposal example program does compile') + \
+        check_mipster_execution('proposal-example.c', 0,
+                                'proposal example program executes correctly') + \
+        check_compilable('proposal-example-exact.c',
+                         'exact proposal example program does compile') + \
+        check_mipster_execution('proposal-example-exact.c', 0,
+                                'exact proposal example program executes correctly') + \
+        check_compilable('auto-deref.c',
+                         'auto with dereferencing does compile') + \
+        check_mipster_execution('auto-deref.c', 0,
+                                'auto with dereferencing has the right value') + \
+        check_compilable('auto-nested.c',
+                         'auto with nested declarations does compile') + \
+        check_mipster_execution('auto-nested.c', 0,
+                                'auto with nested declarations has the right value') + \
+        check_compilable('invalid-fstring-add.c',
+                         'fstring + fstring does not compile', should_succeed=False) + \
+        check_compilable('invalid-circular-dep.c',
+                         'circular dependency does not compile', should_succeed=False) + \
+        check_compilable('invalid-undefined-var.c',
+                         'undefined variable does not compile', should_succeed=False) + \
+        check_compilable('invalid-void-auto.c',
+                         'auto on a void expression does not compile', should_succeed=False)
+
+assignment_auto_type_inference = Assignment('auto-type-inference', 'Flo', 'auto-type-inference',
+           REPO_BLOB_BASE_URI + 'grader/compiler-assignments.md#assignment-auto-type-inference',
+           check_auto_type_inference)
+
 assignments: List[Assignment] = [
     assignment_print_your_name,
     assignment_hex_literal,
@@ -458,7 +512,8 @@ assignments: List[Assignment] = [
     assignment_lock,
     assignment_threads,
     assignment_threadsafe_malloc,
-    assignment_treiber_stack
+    assignment_treiber_stack,
+    assignment_auto_type_inference
 ]
 
 

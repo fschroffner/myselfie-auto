@@ -1,0 +1,123 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage[top=1.5cm, bottom=1.5cm, left=2.3cm, right=2.3cm]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{helvet}     % Helvetica-compatible sans (~ Liberation Sans)
+\usepackage{courier}    % monospace (~ DejaVu Sans Mono)
+\renewcommand{\familydefault}{\sfdefault}
+
+% Colors
+\definecolor{codebg}{RGB}{244,248,240}
+\definecolor{codegreen}{RGB}{26,58,26}
+\definecolor{headcolor}{RGB}{46,64,87}
+\definecolor{notecolor}{RGB}{240,247,255}
+\definecolor{noteborder}{RGB}{100,149,200}
+
+% Code style
+\lstdefinelanguage{Cstar}{
+  keywords={auto, if, else, while, return, void, uint64_t, char},
+  keywordstyle=\bfseries\color{headcolor},
+  comment=[l]{//},
+  commentstyle=\itshape\color{gray},
+  stringstyle=\color{codegreen},
+  morestring=[b]",
+  sensitive=true
+}
+
+\lstset{
+  language=Cstar,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{lightgray},
+  xleftmargin=12pt,
+  xrightmargin=12pt,
+  framexleftmargin=8pt,
+  framexrightmargin=8pt,
+  framextopmargin=5pt,
+  framexbottommargin=5pt,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+  aboveskip=6pt,
+  belowskip=6pt,
+}
+
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+% Header
+{\small [Florian Schroffner] \hfill \today}
+
+\vspace{0.2cm}
+\hrule height 1.5pt
+\vspace{0.15cm}
+
+{\large \textbf{\textcolor{headcolor}{Projektvorschlag: Selfie/C* um Type Inference (\texttt{auto}) erweitern}}}\\
+
+\vspace{0.15cm}
+\hrule height 0.4pt
+\vspace{0.2cm}
+
+\textbf{Typsystem}
+
+Die Erweiterung bleibt bewusst innerhalb des Typsystems von C* (\texttt{uint64\_t}, \texttt{uint64\_t*}): \texttt{auto} leitet einen dieser beiden bestehenden Typen ab, ohne neue Typen oder implizite Konversionen einzuführen. Der interessante Inferenzfall liegt nicht bei primitiven Typen, sondern bei \textbf{Pointern}: \texttt{\&}, \texttt{*} und Pointer-Arithmetik verändern den Typ --- und genau diesen Typ liefert Selfies Ausdrucks-Compiler bereits als Rückgabewert zurück. Vergleiche liefern \texttt{uint64\_t} mit Wert 0 oder 1, analog zu C:
+
+\vspace{1pt}
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Operation} & \textbf{Inferenz-Beispiel} & \textbf{Ergebnis} \\
+\midrule
+Integer-Literal & \texttt{auto n = 10;}      & \texttt{uint64\_t}  \\
+Adresse \texttt{\&} & \texttt{auto p = \&n;}  & \texttt{uint64\_t*} \\
+String-Literal  & \texttt{auto s = "Selfie";} & \texttt{uint64\_t*} \\
+Deref \texttt{*} & \texttt{auto x = *p;}     & \texttt{uint64\_t}  \\
+Ptr-Arithmetik  & \texttt{auto q = p + 1;}   & \texttt{uint64\_t*} \\
+Vergleich       & \texttt{auto b = (n > 0);} & \texttt{uint64\_t} (0/1) \\
+Fehler          & \texttt{p + q} (beide Ptr) & \textit{Compilerfehler} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{1pt}
+
+\textbf{Beispielprogramm}
+
+\begin{lstlisting}
+uint64_t increment(uint64_t i) { return i + 1; }
+
+uint64_t main() {
+    auto n      = 10;             // uint64_t  -- Integer-Literal
+    auto result = increment(n);   // uint64_t  -- Rueckgabetyp der Funktion
+    auto flag   = (result > 0);   // uint64_t  -- Vergleich: 0 oder 1
+
+    auto p      = &n;             // uint64_t* -- Adresse von n
+    auto q      = p + 1;          // uint64_t* -- Pointer-Arithmetik
+    auto x      = *p;             // uint64_t  -- Dereferenz
+
+    auto s      = "Selfie";       // uint64_t* -- String-Literal (char*)
+    // auto err = p + q;          // FEHLER    -- Pointer + Pointer ist undefiniert
+    return x - n;                 // 0 bei Erfolg
+}
+\end{lstlisting}
+
+\textbf{Architektur: weiterhin ein einziger Pass}
+
+Die Erweiterung verändert Selfies Single-Pass-Architektur \emph{nicht}: \texttt{Scanner $\rightarrow$ rekursiver Abstiegsparser \texttt{+} Code-Emitter $\rightarrow$ RISC-U}. Es wird \textbf{kein} expliziter AST aufgebaut und \textbf{kein} eigener Typcheck-Pass eingeführt. Der Schlüssel ist, dass Selfies Ausdrucks-Compiler bereits lokal Typen verfolgt: Jede \texttt{compile\_*}-Funktion gibt den Typ (\texttt{UINT64\_T} oder \texttt{UINT64STAR\_T}) des soeben erzeugten Werts zurück. Eine \texttt{auto}-Deklaration \emph{liest diesen Typ lediglich aus} dem Rückgabewert von \texttt{compile\_expression()} und trägt ihn in die Symboltabelle ein. Die Änderung betrifft drei Funktionen in \texttt{selfie.c}; der Code-Generator und das Typsystem bleiben unberührt.
+
+\textbf{Grenzen der Inferenz}
+
+Die Inferenz ist bewusst \textbf{lokal} gehalten: Der Typ einer \texttt{auto}-Variable wird ausschließlich aus dem direkten Initialisierer abgeleitet --- nie aus späterem Verwendungskontext. Da im Single-Pass ein Bezeichner vor seiner Verwendung deklariert sein muss, sind zirkuläre und vorwärtsgerichtete Abhängigkeiten (\texttt{auto x = y; auto y = x;}) automatisch ein Fehler (``undeclared identifier''). Damit bleibt die Inferenz stets entscheidbar, auf Kosten von Ausdrucksstärke.
+
+\end{document}
