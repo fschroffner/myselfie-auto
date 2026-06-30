@@ -2865,12 +2865,10 @@ uint64_t string_length(char* s) {
 }
 
 char* string_copy(char* s) {
-  uint64_t l;
-  char* t;
   uint64_t i;
 
-  l = string_length(s);
-  t = string_alloc(l);
+  auto l = string_length(s);
+  auto t = string_alloc(l);
   i = 0;
 
   while (i < l) {
@@ -3384,12 +3382,11 @@ uint64_t vdsprintf(uint64_t fd, char* buffer, char* s, uint64_t* args) {
 
 uint64_t non_0_boot_level_printf(char* format, ...) {
   uint64_t* args;
-  uint64_t written_bytes;
 
   args = (uint64_t*) 0;
 
   var_start(args);
-  written_bytes = vdsprintf(1, (char*) 0, format, args);
+  auto written_bytes = vdsprintf(1, (char*) 0, format, args);
   var_end(args);
 
   return written_bytes;
@@ -3397,12 +3394,11 @@ uint64_t non_0_boot_level_printf(char* format, ...) {
 
 uint64_t non_0_boot_level_sprintf(char* buffer, char* format, ...) {
   uint64_t* args;
-  uint64_t written_bytes;
 
   args = (uint64_t*) 0;
 
   var_start(args);
-  written_bytes = vdsprintf(0, buffer, format, args);
+  auto written_bytes = vdsprintf(0, buffer, format, args);
   var_end(args);
 
   return written_bytes;
@@ -3410,12 +3406,11 @@ uint64_t non_0_boot_level_sprintf(char* buffer, char* format, ...) {
 
 uint64_t non_0_boot_level_dprintf(uint64_t fd, char* format, ...) {
   uint64_t* args;
-  uint64_t written_bytes;
 
   args = (uint64_t*) 0;
 
   var_start(args);
-  written_bytes = vdsprintf(fd, (char*) 0, format, args);
+  auto written_bytes = vdsprintf(fd, (char*) 0, format, args);
   var_end(args);
 
   return written_bytes;
@@ -3571,13 +3566,12 @@ void syntax_error_expected_character(char expected) {
 }
 
 void get_character() {
-  uint64_t number_of_read_bytes;
 
   // assert: character_buffer is mapped
 
   // try to read 1 character into character_buffer
   // from file with source_fd file descriptor
-  number_of_read_bytes = read(source_fd, (uint64_t*) character_buffer, 1);
+  auto number_of_read_bytes = read(source_fd, (uint64_t*) character_buffer, 1);
 
   if (number_of_read_bytes == 1) {
     // store the read character in the global variable called character
@@ -4154,10 +4148,9 @@ uint64_t* search_local_symbol_table(char* string) {
 }
 
 uint64_t* get_scoped_symbol_table_entry(char* string) {
-  uint64_t* entry;
 
   // local variables override global variables
-  entry = search_local_symbol_table(string);
+  auto entry = search_local_symbol_table(string);
 
   if (entry == (uint64_t*) 0)
     entry = search_global_symbol_table(string, VARIABLE);
@@ -4676,11 +4669,10 @@ uint64_t compile_initialize(uint64_t type) {
 }
 
 uint64_t compile_cast(uint64_t type) {
-  uint64_t cast;
 
   // lookahead of 1: "(" already parsed
 
-  cast = compile_type();
+  auto cast = compile_type();
 
   if (type != UNDECLARED_T)
     if (type != cast)
@@ -4709,7 +4701,6 @@ uint64_t compile_value() {
 
 void compile_auto_declaration() {
   char* var_name;
-  uint64_t inferred_type;
 
   // consume 'auto'
   get_symbol();
@@ -4725,7 +4716,7 @@ void compile_auto_declaration() {
   get_expected_symbol(SYM_ASSIGN);
 
   // compile RHS expression; result ends up in current_temporary()
-  inferred_type = compile_expression();
+  auto inferred_type = compile_expression();
 
   // auto must bind a value; a void expression (e.g. a void procedure call)
   // yields no usable type to infer
@@ -4799,13 +4790,11 @@ void compile_statement() {
 }
 
 uint64_t load_upper_value(uint64_t reg, uint64_t value) {
-  uint64_t lower;
-  uint64_t upper;
 
   // assert: -2^31 <= value < 2^31
 
-  lower = get_bits(value,  0, 12);
-  upper = get_bits(value, 12, 20);
+  auto lower = get_bits(value,  0, 12);
+  auto upper = get_bits(value, 12, 20);
 
   if (lower >= two_to_the_power_of(11)) {
     // add 1 which is effectively 2^12 to cancel sign extension of lower
@@ -4850,9 +4839,8 @@ uint64_t load_upper_value(uint64_t reg, uint64_t value) {
 }
 
 uint64_t load_upper_address(uint64_t* entry) {
-  uint64_t offset;
 
-  offset = get_address(entry);
+  auto offset = get_address(entry);
 
   if (not(is_signed_integer(offset, 12))) {
     // offset does not fit 12-bit immediate value
@@ -4869,11 +4857,10 @@ uint64_t load_upper_address(uint64_t* entry) {
 }
 
 uint64_t load_value(uint64_t* entry) {
-  uint64_t offset;
 
   // assert: n = allocated_temporaries
 
-  offset = load_upper_address(entry);
+  auto offset = load_upper_address(entry);
 
   if (offset == get_address(entry)) {
     // offset fits 12-bit immediate value
@@ -4891,9 +4878,8 @@ uint64_t load_value(uint64_t* entry) {
 }
 
 uint64_t* get_variable_entry(char* variable) {
-  uint64_t* entry;
 
-  entry = get_scoped_symbol_table_entry(variable);
+  auto entry = get_scoped_symbol_table_entry(variable);
 
   if (entry == (uint64_t*) 0) {
     syntax_error_undeclared_identifier(variable);
@@ -5014,13 +5000,12 @@ void compile_assignment(char* variable) {
 }
 
 uint64_t compile_expression() {
-  uint64_t ltype;
   uint64_t operator_symbol;
   uint64_t rtype;
 
   // assert: n = allocated_temporaries
 
-  ltype = compile_arithmetic();
+  auto ltype = compile_arithmetic();
 
   // assert: allocated_temporaries == n + 1
 
@@ -5093,13 +5078,12 @@ uint64_t compile_expression() {
 }
 
 uint64_t compile_arithmetic() {
-  uint64_t ltype;
   uint64_t operator_symbol;
   uint64_t rtype;
 
   // assert: n = allocated_temporaries
 
-  ltype = compile_term();
+  auto ltype = compile_term();
 
   // assert: allocated_temporaries == n + 1
 
@@ -5165,13 +5149,12 @@ uint64_t compile_arithmetic() {
 }
 
 uint64_t compile_term() {
-  uint64_t ltype;
   uint64_t operator_symbol;
   uint64_t rtype;
 
   // assert: n = allocated_temporaries
 
-  ltype = compile_factor();
+  auto ltype = compile_factor();
 
   // assert: allocated_temporaries == n + 1
 
@@ -5367,12 +5350,11 @@ void load_small_and_medium_integer(uint64_t reg, uint64_t value) {
 }
 
 void load_big_integer(uint64_t value) {
-  uint64_t* entry;
 
   // assert: n = allocated_temporaries
 
   // reuse big integers
-  entry = search_global_symbol_table(integer, BIGINT);
+  auto entry = search_global_symbol_table(integer, BIGINT);
 
   if (entry == (uint64_t*) 0) {
     // allocate memory for big integer in data segment
@@ -5417,12 +5399,11 @@ void load_address(uint64_t* entry) {
 }
 
 void load_string() {
-  uint64_t* entry;
 
   // assert: n = allocated_temporaries
 
   // reuse string literals
-  entry = search_global_symbol_table(string, STRING);
+  auto entry = search_global_symbol_table(string, STRING);
 
   if (entry == (uint64_t*) 0) {
     // allocate memory for string in data segment
@@ -5920,9 +5901,8 @@ void restore_temporaries(uint64_t number_of_temporaries) {
 }
 
 uint64_t macro_expand(uint64_t* entry) {
-  char* name;
 
-  name = get_string(entry);
+  auto name = get_string(entry);
 
   if (string_compare(name, "var_start"))
     macro_var_start();
@@ -5974,8 +5954,6 @@ uint64_t procedure_call(uint64_t* entry, char* procedure, uint64_t number_of_act
 }
 
 uint64_t compile_call(char* procedure) {
-  uint64_t* entry;
-  uint64_t number_of_temporaries;
   uint64_t allocate_memory_on_stack;
   uint64_t number_of_actual_parameters;
   uint64_t number_of_formal_parameters;
@@ -5985,7 +5963,7 @@ uint64_t compile_call(char* procedure) {
 
   get_symbol();
 
-  entry = search_global_symbol_table(procedure, MACRO);
+  auto entry = search_global_symbol_table(procedure, MACRO);
 
   if (entry != (uint64_t*) 0)
     // actually expanding a macro, not calling a procedure
@@ -5993,7 +5971,7 @@ uint64_t compile_call(char* procedure) {
 
   // assert: n = allocated_temporaries
 
-  number_of_temporaries = save_temporaries();
+  auto number_of_temporaries = save_temporaries();
 
   // assert: allocated_temporaries == 0
 
@@ -6788,11 +6766,9 @@ uint64_t encode_s_format(uint64_t immediate, uint64_t rs2, uint64_t rs1, uint64_
 }
 
 uint64_t get_immediate_s_format(uint64_t instruction) {
-  uint64_t imm1;
-  uint64_t imm2;
 
-  imm1 = get_bits(instruction, 25, 7);
-  imm2 = get_bits(instruction,  7, 5);
+  auto imm1 = get_bits(instruction, 25, 7);
+  auto imm2 = get_bits(instruction,  7, 5);
 
   return sign_extend(left_shift(imm1, 5) + imm2, 12);
 }
@@ -6840,15 +6816,11 @@ uint64_t encode_b_format(uint64_t immediate, uint64_t rs2, uint64_t rs1, uint64_
 }
 
 uint64_t get_immediate_b_format(uint64_t instruction) {
-  uint64_t imm1;
-  uint64_t imm2;
-  uint64_t imm3;
-  uint64_t imm4;
 
-  imm1 = get_bits(instruction, 31, 1);
-  imm2 = get_bits(instruction, 25, 6);
-  imm3 = get_bits(instruction,  8, 4);
-  imm4 = get_bits(instruction,  7, 1);
+  auto imm1 = get_bits(instruction, 31, 1);
+  auto imm2 = get_bits(instruction, 25, 6);
+  auto imm3 = get_bits(instruction,  8, 4);
+  auto imm4 = get_bits(instruction,  7, 1);
 
   // reassemble immediate and add trailing zero
   return sign_extend(left_shift(left_shift(left_shift(left_shift(imm1, 1) + imm4, 6) + imm2, 4) + imm3, 1), 13);
@@ -6895,15 +6867,11 @@ uint64_t encode_j_format(uint64_t immediate, uint64_t rd, uint64_t opcode) {
 }
 
 uint64_t get_immediate_j_format(uint64_t instruction) {
-  uint64_t imm1;
-  uint64_t imm2;
-  uint64_t imm3;
-  uint64_t imm4;
 
-  imm1 = get_bits(instruction, 31,  1);
-  imm2 = get_bits(instruction, 21, 10);
-  imm3 = get_bits(instruction, 20,  1);
-  imm4 = get_bits(instruction, 12,  8);
+  auto imm1 = get_bits(instruction, 31,  1);
+  auto imm2 = get_bits(instruction, 21, 10);
+  auto imm3 = get_bits(instruction, 20,  1);
+  auto imm4 = get_bits(instruction, 12,  8);
 
   // reassemble immediate and add trailing zero
   return sign_extend(left_shift(left_shift(left_shift(left_shift(imm1, 8) + imm4, 1) + imm3, 10) + imm2, 1), 21);
@@ -7218,9 +7186,8 @@ void emit_ecall() {
 }
 
 void fixup_BFormat(uint64_t from_address) {
-  uint64_t instruction;
 
-  instruction = load_instruction(from_address);
+  auto instruction = load_instruction(from_address);
 
   store_instruction(from_address,
     encode_b_format(code_size - from_address,
@@ -7231,9 +7198,8 @@ void fixup_BFormat(uint64_t from_address) {
 }
 
 void fixup_JFormat(uint64_t from_address, uint64_t to_address) {
-  uint64_t instruction;
 
-  instruction = load_instruction(from_address);
+  auto instruction = load_instruction(from_address);
 
   store_instruction(from_address,
     encode_j_format(to_address - from_address,
@@ -7254,9 +7220,8 @@ void fixlink_JFormat(uint64_t from_address, uint64_t to_address) {
 }
 
 void fixup_IFormat(uint64_t from_address, uint64_t immediate) {
-  uint64_t instruction;
 
-  instruction = load_instruction(from_address);
+  auto instruction = load_instruction(from_address);
 
   store_instruction(from_address,
     encode_i_format(immediate,
@@ -7277,15 +7242,13 @@ void emit_data_word(uint64_t data, uint64_t offset, uint64_t source_line_number)
 }
 
 void emit_string_data(uint64_t* entry) {
-  char* s;
   uint64_t i;
-  uint64_t l;
 
-  s = get_string(entry);
+  auto s = get_string(entry);
 
   i = 0;
 
-  l = round_up(string_length(s) + 1, WORDSIZE);
+  auto l = round_up(string_length(s) + 1, WORDSIZE);
 
   while (i < l) {
     emit_data_word(load_word((uint64_t*) s, i, 1), get_address(entry) + i, get_line_number(entry));
@@ -7460,10 +7423,9 @@ void encode_elf_program_header(uint64_t* header, uint64_t ph_index) {
 }
 
 uint64_t validate_elf_file_header_top(uint64_t* header) {
-  uint64_t magic_number;
   uint64_t ei_class;
 
-  magic_number = load_word(header, 0, 0);
+  auto magic_number = load_word(header, 0, 0);
 
   if (get_bits(magic_number, 0, 8) == EI_MAG0)
     if (get_bits(magic_number, 8, 8) == EI_MAG1)
@@ -7568,9 +7530,6 @@ uint64_t open_write_only(char* name, uint64_t mode) {
 }
 
 void selfie_output(char* filename) {
-  uint64_t fd;
-  uint64_t* ELF_header;
-  uint64_t code_size_with_padding;
 
   binary_name = filename;
 
@@ -7582,7 +7541,7 @@ void selfie_output(char* filename) {
 
   // assert: binary_name is mapped and not longer than MAX_FILENAME_LENGTH
 
-  fd = open_write_only(binary_name, S_IRUSR_IWUSR_IXUSR_IRGRP_IXGRP_IROTH_IXOTH);
+  auto fd = open_write_only(binary_name, S_IRUSR_IWUSR_IXUSR_IRGRP_IXGRP_IROTH_IXOTH);
 
   if (signed_less_than(fd, 0)) {
     printf("%s: could not create binary output file %s\n", selfie_name, binary_name);
@@ -7590,7 +7549,7 @@ void selfie_output(char* filename) {
     exit(EXITCODE_IOERROR);
   }
 
-  ELF_header = encode_elf_header();
+  auto ELF_header = encode_elf_header();
 
   // assert: ELF_header is mapped
 
@@ -7601,7 +7560,7 @@ void selfie_output(char* filename) {
     exit(EXITCODE_IOERROR);
   }
 
-  code_size_with_padding = round_up(code_size, PAGESIZE);
+  auto code_size_with_padding = round_up(code_size, PAGESIZE);
 
   touch(code_binary, code_size_with_padding);
 
@@ -7632,9 +7591,6 @@ void selfie_output(char* filename) {
 }
 
 void selfie_load(char* filename) {
-  uint64_t fd;
-  uint64_t* ELF_file_header;
-  uint64_t number_of_read_bytes;
   uint64_t code_file_offset;
   uint64_t code_file_size;
   uint64_t data_file_offset;
@@ -7648,7 +7604,7 @@ void selfie_load(char* filename) {
 
   // assert: binary_name is mapped and not longer than MAX_FILENAME_LENGTH
 
-  fd = open_read_only(binary_name);
+  auto fd = open_read_only(binary_name);
 
   if (signed_less_than(fd, 0)) {
     printf("%s: could not open input file %s\n", selfie_name, binary_name);
@@ -7660,9 +7616,9 @@ void selfie_load(char* filename) {
   reset_binary();
 
   // allocate and map (on all boot levels) memory for reading into it
-  ELF_file_header = touch(smalloc(MAX_BINARY_SIZE), MAX_BINARY_SIZE);
+  auto ELF_file_header = touch(smalloc(MAX_BINARY_SIZE), MAX_BINARY_SIZE);
 
-  number_of_read_bytes = read(fd, ELF_file_header, 8);
+  auto number_of_read_bytes = read(fd, ELF_file_header, 8);
 
   if (number_of_read_bytes == 8) {
     if (validate_elf_file_header_top(ELF_file_header)) {
@@ -8176,9 +8132,8 @@ void emit_malloc() {
 }
 
 uint64_t try_brk(uint64_t* context, uint64_t new_program_break) {
-  uint64_t current_program_break;
 
-  current_program_break = get_program_break(context);
+  auto current_program_break = get_program_break(context);
 
   if (is_virtual_address_valid(new_program_break, WORDSIZE))
     if (is_address_between_stack_and_heap(context, new_program_break)) {
@@ -8383,13 +8338,12 @@ void reset_all_cache_counters() {
 
 void init_cache_memory(uint64_t* cache) {
   uint64_t number_of_cache_blocks;
-  uint64_t* cache_memory;
   uint64_t i;
   uint64_t* cache_block;
 
   number_of_cache_blocks = get_cache_size(cache) / get_cache_block_size(cache);
 
-  cache_memory = smalloc(number_of_cache_blocks * sizeof(uint64_t*));
+  auto cache_memory = smalloc(number_of_cache_blocks * sizeof(uint64_t*));
 
   set_cache_memory(cache, cache_memory);
 
@@ -8430,13 +8384,12 @@ void init_all_caches() {
 
 void flush_cache(uint64_t* cache) {
   uint64_t number_of_cache_blocks;
-  uint64_t* cache_memory;
   uint64_t i;
   uint64_t* cache_block;
 
   number_of_cache_blocks = get_cache_size(cache) / get_cache_block_size(cache);
 
-  cache_memory = get_cache_memory(cache);
+  auto cache_memory = get_cache_memory(cache);
 
   i = 0;
 
@@ -8501,9 +8454,8 @@ uint64_t* cache_set(uint64_t* cache, uint64_t vaddr) {
 }
 
 uint64_t get_new_timestamp(uint64_t* cache) {
-  uint64_t timestamp;
 
-  timestamp = get_cache_timer(cache);
+  auto timestamp = get_cache_timer(cache);
 
   set_cache_timer(cache, timestamp + 1);
 
@@ -8511,14 +8463,12 @@ uint64_t get_new_timestamp(uint64_t* cache) {
 }
 
 uint64_t* cache_lookup(uint64_t* cache, uint64_t vaddr, uint64_t paddr, uint64_t is_access) {
-  uint64_t tag;
-  uint64_t* set;
   uint64_t i;
   uint64_t* lru_block;
   uint64_t* cache_block;
 
-  tag = cache_tag(cache, paddr);
-  set = cache_set(cache, vaddr);
+  auto tag = cache_tag(cache, paddr);
+  auto set = cache_set(cache, vaddr);
 
   i = 0;
 
@@ -8555,13 +8505,12 @@ uint64_t* cache_lookup(uint64_t* cache, uint64_t vaddr, uint64_t paddr, uint64_t
 
 void fill_cache_block(uint64_t* cache, uint64_t* cache_block, uint64_t paddr) {
   uint64_t number_of_words_in_cache_block;
-  uint64_t* block_memory;
   uint64_t i;
 
   // cache block size / sizeof(uint64_t) (not WORDSIZE)
   number_of_words_in_cache_block = get_cache_block_size(cache) / sizeof(uint64_t);
 
-  block_memory = get_block_memory(cache_block);
+  auto block_memory = get_block_memory(cache_block);
 
   // align paddr to cache block
   paddr = cache_block_address(cache, paddr);
@@ -8594,9 +8543,8 @@ uint64_t* handle_cache_miss(uint64_t* cache, uint64_t* cache_block, uint64_t pad
 }
 
 uint64_t* retrieve_cache_block(uint64_t* cache, uint64_t vaddr, uint64_t paddr, uint64_t is_access) {
-  uint64_t* cache_block;
 
-  cache_block = cache_lookup(cache, vaddr, paddr, is_access);
+  auto cache_block = cache_lookup(cache, vaddr, paddr, is_access);
 
   if (get_valid_flag(cache_block))
     // cache hit
@@ -8607,13 +8555,12 @@ uint64_t* retrieve_cache_block(uint64_t* cache, uint64_t vaddr, uint64_t paddr, 
 
 void flush_cache_block(uint64_t* cache, uint64_t* cache_block, uint64_t paddr) {
   uint64_t number_of_words_in_cache_block;
-  uint64_t* block_memory;
   uint64_t i;
 
   // cache block size / sizeof(uint64_t) (not WORDSIZE)
   number_of_words_in_cache_block = get_cache_block_size(cache) / sizeof(uint64_t);
 
-  block_memory = get_block_memory(cache_block);
+  auto block_memory = get_block_memory(cache_block);
 
   // align paddr to cache block
   paddr = cache_block_address(cache, paddr);
@@ -8628,23 +8575,19 @@ void flush_cache_block(uint64_t* cache, uint64_t* cache_block, uint64_t paddr) {
 }
 
 uint64_t load_from_cache(uint64_t* cache, uint64_t vaddr, uint64_t paddr) {
-  uint64_t* cache_block;
-  uint64_t* block_memory;
 
-  cache_block = retrieve_cache_block(cache, vaddr, paddr, 1);
+  auto cache_block = retrieve_cache_block(cache, vaddr, paddr, 1);
 
-  block_memory = get_block_memory(cache_block);
+  auto block_memory = get_block_memory(cache_block);
 
   return *(block_memory + cache_byte_offset(cache, vaddr) / sizeof(uint64_t));
 }
 
 void store_in_cache(uint64_t* cache, uint64_t vaddr, uint64_t paddr, uint64_t data) {
-  uint64_t* cache_block;
-  uint64_t* block_memory;
 
-  cache_block = retrieve_cache_block(cache, vaddr, paddr, 1);
+  auto cache_block = retrieve_cache_block(cache, vaddr, paddr, 1);
 
-  block_memory = get_block_memory(cache_block);
+  auto block_memory = get_block_memory(cache_block);
 
   *(block_memory + cache_byte_offset(cache, vaddr) / sizeof(uint64_t)) = data;
 
@@ -8751,11 +8694,10 @@ uint64_t* get_PTE_address(uint64_t* parent_table, uint64_t* table, uint64_t page
 }
 
 uint64_t get_page_frame(uint64_t* table, uint64_t page) {
-  uint64_t* PTE_address;
 
   // TODO: translation lookaside buffer (TLB)
 
-  PTE_address = get_PTE_address(0, table, page);
+  auto PTE_address = get_PTE_address(0, table, page);
 
   if (PTE_address == (uint64_t*) 0)
     return 0;
@@ -8965,9 +8907,8 @@ void undo_lui_addi_add_sub_mul_divu_remu_sltu_load_jal_jalr() {
 }
 
 uint64_t print_addi() {
-  uint64_t w;
 
-  w = print_code_context_for_instruction(pc);
+  auto w = print_code_context_for_instruction(pc);
 
   if (rd == REG_ZR)
     if (rs1 == REG_ZR)
@@ -9540,14 +9481,13 @@ void print_jalr_before() {
 }
 
 void do_jalr() {
-  uint64_t next_pc;
 
   // jump and link register
 
   read_register(rs1);
 
   // prepare jump rs1-relative with LSB reset
-  next_pc = left_shift(right_shift(*(registers + rs1) + imm, 1), 1);
+  auto next_pc = left_shift(right_shift(*(registers + rs1) + imm, 1), 1);
 
   if (rd == REG_ZR) {
     // just jump
@@ -10267,10 +10207,9 @@ uint64_t instruction_with_max_counter(uint64_t* counters, uint64_t max) {
 }
 
 uint64_t print_per_instruction_counter(uint64_t total, uint64_t* counters, uint64_t max) {
-  uint64_t a;
   uint64_t c;
 
-  a = instruction_with_max_counter(counters, max);
+  auto a = instruction_with_max_counter(counters, max);
 
   if (a != UINT64_MAX) {
     c = *(counters + a / INSTRUCTIONSIZE);
@@ -10862,11 +10801,10 @@ void gc_init_selfie(uint64_t* context) {
 
 uint64_t* retrieve_from_free_list(uint64_t* context, uint64_t size) {
   uint64_t* prev_node;
-  uint64_t* node;
 
   prev_node = (uint64_t*) 0;
 
-  node = get_free_list_head_gc(context);
+  auto node = get_free_list_head_gc(context);
 
   while (node != (uint64_t*) 0) {
     if (get_metadata_size(node) == size) {
@@ -10954,10 +10892,9 @@ uint64_t* allocate_new_memory(uint64_t* context, uint64_t size) {
 }
 
 uint64_t* reuse_memory(uint64_t* context, uint64_t size) {
-  uint64_t* metadata;
 
   // check if reusable memory is available in free list
-  metadata = retrieve_from_free_list(context, size);
+  auto metadata = retrieve_from_free_list(context, size);
 
   if (metadata != (uint64_t*) 0) {
     // zeroing reused memory is optional!
@@ -10974,14 +10911,13 @@ uint64_t* allocate_memory(uint64_t* context, uint64_t size) {
 }
 
 uint64_t* allocate_memory_selfie(uint64_t* context, uint64_t size) {
-  uint64_t* block;
   uint64_t* metadata;
 
   gc_num_mallocated = gc_num_mallocated + 1;
   gc_mem_mallocated = gc_mem_mallocated + size;
 
   // try reusing memory first
-  block = reuse_memory(context, size);
+  auto block = reuse_memory(context, size);
 
   if (block != (uint64_t*) 0) {
     gc_num_reused_mallocs = gc_num_reused_mallocs + 1;
@@ -11036,7 +10972,6 @@ uint64_t* gc_malloc_implementation(uint64_t* context, uint64_t size) {
 }
 
 uint64_t* get_metadata_if_address_is_valid(uint64_t* context, uint64_t address) {
-  uint64_t* node;
   uint64_t  block;
 
   // pointer below gced heap
@@ -11047,7 +10982,7 @@ uint64_t* get_metadata_if_address_is_valid(uint64_t* context, uint64_t address) 
   if (address >= get_heap_seg_end_gc(context))
     return (uint64_t*) 0;
 
-  node = get_used_list_head_gc(context);
+  auto node = get_used_list_head_gc(context);
 
   while (node != (uint64_t*) 0) {
     if (is_gc_library(context))
@@ -11070,15 +11005,13 @@ uint64_t* get_metadata_if_address_is_valid(uint64_t* context, uint64_t address) 
 }
 
 void mark_block(uint64_t* context, uint64_t address) {
-  uint64_t gc_address;
 
-  gc_address = gc_load_memory(context, address);
+  auto gc_address = gc_load_memory(context, address);
 
   mark_block_selfie(context, gc_address);
 }
 
 void mark_block_selfie(uint64_t* context, uint64_t gc_address) {
-  uint64_t* metadata;
   uint64_t block_start;
   uint64_t block_end;
 
@@ -11086,7 +11019,7 @@ void mark_block_selfie(uint64_t* context, uint64_t gc_address) {
     if (not(is_virtual_address_valid(gc_address, WORDSIZE)))
       return;
 
-  metadata = get_metadata_if_address_is_valid(context, gc_address);
+  auto metadata = get_metadata_if_address_is_valid(context, gc_address);
 
   if (metadata == (uint64_t*) 0)
     // address is not a pointer to a gced block
@@ -11160,12 +11093,11 @@ void sweep(uint64_t* context) {
 
 void sweep_selfie(uint64_t* context) {
   uint64_t* prev_node;
-  uint64_t* node;
   uint64_t* next_node;
 
   prev_node = (uint64_t*) 0;
 
-  node = get_used_list_head_gc(context);
+  auto node = get_used_list_head_gc(context);
 
   while (node != (uint64_t*) 0) {
     // next node changes when memory block is reused
@@ -11350,9 +11282,8 @@ void init_context(uint64_t* context, uint64_t* parent, uint64_t* vctxt) {
 }
 
 uint64_t* create_context(uint64_t* parent, uint64_t* vctxt) {
-  uint64_t* context;
 
-  context = new_context();
+  auto context = new_context();
 
   init_context(context, parent, vctxt);
 
@@ -11461,9 +11392,8 @@ uint64_t highest_page(uint64_t page, uint64_t hi) {
 }
 
 void map_page(uint64_t* context, uint64_t page, uint64_t frame) {
-  uint64_t* table;
 
-  table = get_pt(context);
+  auto table = get_pt(context);
 
   // assert: page is unmapped
 
@@ -11711,10 +11641,9 @@ void up_load_binary(uint64_t* context) {
 }
 
 uint64_t up_load_string(uint64_t* context, char* s, uint64_t SP) {
-  uint64_t bytes;
   uint64_t i;
 
-  bytes = round_up(string_length(s) + 1, WORDSIZE);
+  auto bytes = round_up(string_length(s) + 1, WORDSIZE);
 
   // allocate memory for storing string
   SP = SP - bytes;
@@ -11799,17 +11728,15 @@ void up_load_arguments(uint64_t* context, uint64_t argc, uint64_t* argv) {
 }
 
 char* replace_extension(char* filename, char* suffix, char* extension) {
-  char* s;
-  uint64_t i;
   uint64_t c;
   char* filename_without_extension;
 
   // assert: string_length(filename) + string_length(suffix) + 1 + string_length(extension) < MAX_FILENAME_LENGTH
 
-  s = string_alloc(string_length(filename) + string_length(suffix) + 1 + string_length(extension));
+  auto s = string_alloc(string_length(filename) + string_length(suffix) + 1 + string_length(extension));
 
   // start reading at end of filename
-  i = string_length(filename);
+  auto i = string_length(filename);
 
   c = 0;
 
@@ -11849,13 +11776,11 @@ char* replace_extension(char* filename, char* suffix, char* extension) {
 }
 
 char* boot_level_prefix(char* s) {
-  uint64_t l;
-  char* t;
   uint64_t i;
 
-  l = string_length(s);
+  auto l = string_length(s);
 
-  t = string_alloc(l);
+  auto t = string_alloc(l);
 
   i = 0;
 
@@ -11875,12 +11800,10 @@ char* boot_level_prefix(char* s) {
 }
 
 char* increment_boot_level_prefix(char* s, char* t) {
-  char* p;
-  char* u;
 
-  p = boot_level_prefix(s);
+  auto p = boot_level_prefix(s);
 
-  u = string_alloc(string_length(p) + 1 + 1 + string_length(t));
+  auto u = string_alloc(string_length(p) + 1 + 1 + string_length(t));
 
   sprintf(u, "%s> %s", p, t);
 
@@ -11935,13 +11858,12 @@ uint64_t handle_system_call(uint64_t* context) {
 }
 
 uint64_t handle_page_fault(uint64_t* context) {
-  uint64_t page;
 
   set_exception(context, EXCEPTION_NOEXCEPTION);
 
   set_ec_page_fault(context, get_ec_page_fault(context) + 1);
 
-  page = get_fault(context);
+  auto page = get_fault(context);
 
   if (pavailable()) {
     // TODO: reuse frames
@@ -11987,9 +11909,8 @@ uint64_t handle_timer(uint64_t* context) {
 }
 
 uint64_t handle_exception(uint64_t* context) {
-  uint64_t exception;
 
-  exception = get_exception(context);
+  auto exception = get_exception(context);
 
   if (exception == EXCEPTION_SYSCALL)
     return handle_system_call(context);
