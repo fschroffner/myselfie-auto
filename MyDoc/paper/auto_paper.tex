@@ -3,7 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
-\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage[top=2.4cm, bottom=2.2cm, left=2.5cm, right=2.5cm]{geometry}
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{microtype}
@@ -153,9 +153,9 @@ We design and implement the \texttt{auto} keyword for local variables in C*, the
 This work answers three research questions:
 
 \begin{enumerate}[leftmargin=*, label=\textbf{RQ\arabic*.}]
-  \item Can initialiser-driven \texttt{auto} deduction be added to a single-pass compiler without introducing an AST or a separate semantic pass?
-  \item What is the smallest set of changes to \texttt{selfie.c} that implements \texttt{auto} correctly, including stack allocation and procedure cleanup?
-  \item Does the resulting compiler still satisfy Selfie's self-referentiality requirement --- that it compile its own source --- even when that source itself uses \texttt{auto}?
+  \item \emph{Feasibility.} Can initialiser-driven \texttt{auto} deduction be added to a single-pass compiler without introducing an AST or a separate semantic pass?
+  \item \emph{Mechanism.} By what mechanism are the two open problems --- reading back the type and allocating the variable's stack slot in a single pass --- solved, and how localised is the resulting change to \texttt{selfie.c}?
+  \item \emph{Self-referentiality.} Does the resulting compiler still satisfy Selfie's requirement that it compile its own source, even when that source itself uses \texttt{auto}?
 \end{enumerate}
 
 \subsection{Type Inference Primer}
@@ -175,7 +175,7 @@ The phrase ``type inference'' is used loosely for two mechanisms that differ sha
 \subsection{Related Work}
 \label{sec:related}
 
-Local type deduction from an initialiser is not new; what is specific here is doing it in a single pass without an AST. The classic compiler pipeline~\cite{dragonbook} separates parsing, semantic analysis, and code generation, and resolves types on an explicit syntax tree --- the setting in which Hindley--Milner inference~\cite{hindleymilner} is normally described. Production languages show that deduction needs far less: C++ \texttt{auto}~\cite{cppstd} and C23 \texttt{auto}~\cite{c23} deduce a local's type from its initialiser, and Go's \texttt{:=} does the same, all specified as a one-directional, declaration-local rule rather than whole-program inference. Single-pass, AST-free compilers in the Wirth tradition~\cite{wirth}, of which Selfie's is a descendant, already thread type information through recursive-descent parsing while emitting code directly. Selfie itself has been extended before in this spirit, for instance by a conservative garbage collector added as a bachelor project~\cite{bachinger}. This work occupies the intersection: it shows that the initialiser-local deduction of C++/Go/C23 needs none of the AST machinery of the classic pipeline, because a Wirth-style single pass already computes the required type as a by-product of code generation.
+Local type deduction from an initialiser is not new; what is specific here is doing it in a single pass without an AST. The classic compiler pipeline~\cite{dragonbook} separates parsing, semantic analysis, and code generation, and resolves types on an explicit syntax tree --- the setting in which Hindley--Milner inference~\cite{hindleymilner} is normally described. Production languages show that deduction needs far less: C++ \texttt{auto}~\cite{cppstd} and C23 \texttt{auto}~\cite{c23} deduce a local's type from its initialiser, and Go's \texttt{:=} does the same, all specified as a one-directional, declaration-local rule rather than whole-program inference. Single-pass, AST-free compilers in the Wirth tradition~\cite{wirth}, of which Selfie's is a descendant, already thread type information through recursive-descent parsing while emitting code directly; production single-pass C compilers such as TCC~\cite{tcc} do the same, tracking each operand's type on a value stack rather than on a persisting tree. What all of these share, and what the classic pipeline relaxes, is a \emph{declaration-before-use} rule: because a name's type is fixed before it is read, type information never flows backward --- precisely the property that makes initialiser-local deduction expressible in one pass. Selfie itself has been extended before in this spirit, for instance by a conservative garbage collector added as a bachelor project~\cite{bachinger}. This work occupies the intersection: it shows that the initialiser-local deduction of C++/Go/C23 needs none of the AST machinery of the classic pipeline, because a Wirth-style single pass already computes the required type as a by-product of code generation.
 
 \subsection{The Target Architecture}
 \label{sec:architecture}
@@ -185,12 +185,12 @@ Although deduction needs no knowledge of the target machine, the implementation 
 \subsubsection{RISC-U and C*}
 \label{sec:riscu}
 
-Selfie~\cite{selfie} compiles C* to RISC-U. C* is a strict subset of C with only two types --- the unsigned 64-bit integer \texttt{uint64\_t} and the pointer \texttt{uint64\_t*} --- no floating point, and no composite types. RISC-U is a tiny subset of the RISC-V instruction set~\cite{riscv} with 14 instructions (\texttt{lui}, \texttt{addi}, \texttt{add}, \texttt{sub}, \texttt{mul}, \texttt{divu}, \texttt{remu}, \texttt{sltu}, \texttt{ld}, \texttt{sd}, \texttt{beq}, \texttt{jal}, \texttt{jalr}, \texttt{ecall}). Because both registers and datatypes are 64-bit, a valid address is always a multiple of eight bytes. The two-type system is central to this work: it is why \texttt{auto} has only two possible answers and why there is no promotion lattice to search.
+Selfie~\cite{selfie} compiles C* to RISC-U. C* is a strict subset of C with only two types --- the unsigned 64-bit integer \texttt{uint64\_t} and the pointer \texttt{uint64\_t*} --- no floating point, and no composite types. RISC-U is a tiny subset of the RISC-V instruction set~\cite{riscv} with 14 instructions (\texttt{lui}, \texttt{addi}, \texttt{add}, \texttt{sub}, \texttt{mul}, \texttt{divu}, \texttt{remu}, \texttt{sltu}, \texttt{ld}, \texttt{sd}, \texttt{beq}, \texttt{jal}, \texttt{jalr}, \texttt{ecall}). Instructions use the 32-bit RISC-V encoding and are four-byte aligned, whereas registers and data words are 64-bit, so a data address is always a multiple of eight bytes. The two-type system is central to this work: it is why \texttt{auto} has only two possible answers and why there is no promotion lattice to search.
 
 \subsubsection{Memory}
 \label{sec:memory}
 
-A RISC-U program runs in a byte-addressed linear address space divided into four segments: code, data, heap, and stack (Figure~\ref{fig:memory}). Code and data are static and fixed at compile time; the heap and stack are dynamic. The heap sits just above the static data and grows upward (it backs \texttt{malloc}); the stack sits at the top of memory and grows downward. The boundary between the static and dynamic parts is the program break (Equation~\ref{eq:break}).
+A RISC-U program runs in a byte-addressed linear address space divided into four segments: code, data, heap, and stack (Figure~\ref{fig:memory}). Code and data are static and fixed at compile time; the heap and stack are dynamic. The heap sits just above the static data and grows upward (it backs \texttt{malloc}); the stack sits at the top of a 4\,GB ($2^{32}$-byte) virtual address space and grows downward, even though registers are 64-bit. The boundary between the static and dynamic parts is the program break (Equation~\ref{eq:break}).
 
 \begin{figure}[H]
 \centering
@@ -201,7 +201,6 @@ A RISC-U program runs in a byte-addressed linear address space divided into four
   \node[seg, fill=boxgreen, below=0pt of free] (heap) {Heap \ $\uparrow$};
   \node[seg, fill=boxblue, below=0pt of heap] (data) {Data};
   \node[seg, fill=boxblue!60, below=0pt of data] (code) {Code};
-  \draw[->] ($(stack.north east)+(0.4,0)$) ++(0,0) -- ++(0,-0.6) node[midway,right]{};
   \node[right=0.5cm of stack, font=\footnotesize] {high address ($2^{32}$)};
   \node[right=0.5cm of code, font=\footnotesize] {low address};
 \end{tikzpicture}
@@ -323,7 +322,7 @@ The scanner gains a single keyword. The identifier \texttt{auto} is recognised a
 
 \texttt{auto} deduces one of Selfie's two existing types (Table~\ref{tab:types}). It adds no types, widths, or conversions: the deduced type is precisely what Selfie's expression compiler already produces for the initialiser. Because there is no second numeric type, there is no promotion rule and no implicit conversion to specify. The pointer rules are inherited verbatim from C* (Table~\ref{tab:ptrs}); \texttt{auto} merely reports their result.
 
-\begin{table}[H]
+\begin{table}[ht]
 \centering
 \caption{The two types \texttt{auto} can deduce}
 \label{tab:types}
@@ -337,7 +336,7 @@ The scanner gains a single keyword. The identifier \texttt{auto} is recognised a
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
+\begin{table}[ht]
 \centering
 \caption{Pointer type rules (unchanged from Selfie)}
 \label{tab:ptrs}
@@ -371,7 +370,7 @@ compile_auto_declaration():
         consume ';'
 \end{lstlisting}
 
-The actual C* implementation is shown in Listing~\ref{lst:core}. There is no type computation of its own: the single line \texttt{inferred\_type = compile\_expression()} captures the type the parser already produced (Figure~\ref{fig:typeflow}). This is why no AST and no separate pass are required.
+The actual C* implementation is shown in Listing~\ref{lst:core}. There is no type computation of its own: the single line \texttt{inferred\_type = compile\_expression()} captures the type the parser already produced (Figure~\ref{fig:typeflow}). This is why no AST and no separate pass are required. (The name \texttt{inferred\_type} follows Selfie's existing style; the mechanism is strictly deduction, per Section~\ref{sec:deduction-vs-inference}.)
 
 \begin{lstlisting}[language=C, caption={The core of the feature in \texttt{selfie.c}}, label={lst:core}]
 void compile_auto_declaration() {
@@ -426,7 +425,7 @@ Selfie's defining requirement is self-referentiality: the compiler must compile 
 \subsection{Self-Compilation}
 \label{sec:selfcompile}
 
-Because the \texttt{auto} extension keeps C* a strict superset, the unmodified \texttt{selfie.c} still self-compiles. Running \texttt{./selfie -c selfie.c -o selfie.m} produces a RISC-U binary of \textbf{43\,624} 64-bit instructions and \textbf{14\,496} bytes of data (a 188\,992-byte loaded image), which executes correctly under the mipster emulator. Adding \texttt{auto} grows the compiler only by the handful of instructions needed for the new function and the statement branch.
+Because the \texttt{auto} extension keeps C* a strict superset, the unmodified \texttt{selfie.c} still self-compiles. Running \texttt{./selfie -c selfie.c -o selfie.m} produces a RISC-U binary of \textbf{43\,624} instructions and \textbf{14\,496} bytes of data --- a 188\,992-byte loaded image, since RISC-U uses the 32-bit RISC-V encoding ($43\,624 \times 4 + 14\,496 = 188\,992$) --- which executes correctly under the mipster emulator. Adding \texttt{auto} grows the compiler only by the handful of instructions needed for the new function and the statement branch.
 
 \subsection{Self-Application: an \texttt{auto}-ised Selfie}
 \label{sec:dogfooding}
@@ -466,9 +465,9 @@ The strongest correctness criterion for a self-hosting compiler is a self-self f
 \subsection{Autograder Results}
 \label{sec:autograder}
 
-Two autograder targets are relevant (Table~\ref{tab:grader}). The \texttt{self-compile} target verifies that self-compilation still succeeds --- all checks pass: \texttt{make selfie}, a warning-free \texttt{./selfie -c selfie.c}, and \texttt{.m} binary creation. The dedicated \texttt{auto-type-inference} target exercises the feature directly with positive (compile-and-run) and negative (must-reject) programs. Each positive program both compiles \emph{and} returns exit code~0, so an incorrect deduction would change the result; the suite therefore validates the deduced type, not merely acceptance of the syntax.
+Two autograder targets are relevant (Table~\ref{tab:grader}). The \texttt{self-compile} target confirms self-compilation still succeeds (all checks pass). The dedicated \texttt{auto-type-inference} target exercises the feature with positive and negative programs; each positive program both compiles \emph{and} returns exit code~0, so an incorrect deduction would change the result --- the suite validates the deduced type, not merely acceptance of the syntax.
 
-\begin{table}[H]
+\begin{table}[ht]
 \centering
 \caption{Autograder \texttt{auto-type-inference} suite: all 14 programs behave as required.}
 \label{tab:grader}
@@ -504,9 +503,9 @@ Set against baseline Selfie, the result is deliberately unremarkable: the single
 \subsection{Fold Rate and Code-Size Impact on \texttt{selfie.c}}
 \label{sec:foldrate}
 
-The self-application of Section~\ref{sec:dogfooding} folds 79 of the 327 local declarations in \texttt{selfie.c}. A static scan classifies why the other 248 are \emph{not} folded (Table~\ref{tab:foldrate}): most simply do not have a single typed call as their initialiser, and in the next-largest group the initialiser \emph{is} a call but the variable's first assignment is conditional, so its first use is not the top-level assignment the cast-free rule requires. None of the 248 is a case the deducer \emph{could not} type; they are excluded by the conservative, cast-free folding predicate, not by a limitation of \texttt{auto}.
+The self-application of Section~\ref{sec:dogfooding} folds 79 of the 327 local declarations in \texttt{selfie.c}. A static scan classifies why the other 248 are \emph{not} folded (Table~\ref{tab:foldrate}): most simply do not have a single typed call as their initialiser, and in the next-largest group the initialiser \emph{is} a call but the variable's first assignment is conditional, so its first use is not the top-level assignment the cast-free rule requires. None of the 248 is a case the deducer \emph{could not} type; they are excluded by the conservative, cast-free folding predicate, not by a limitation of \texttt{auto}. The \texttt{malloc}/\texttt{void*} hazard of Section~\ref{sec:dogfooding} is a rule-level illustration, not a driver of these counts: \texttt{selfie.c}'s single allocation site already carries an explicit cast, so \texttt{void*} folds do not arise in practice.
 
-\begin{table}[H]
+\begin{table}[ht]
 \centering
 \caption{Why the 248 non-folded declarations are left classic. A static scan classifies 236; the remaining twelve have multi-line declarations the scan does not track.}
 \label{tab:foldrate}
@@ -537,7 +536,7 @@ The feature is intentionally minimal, leaving several local extensions open, non
 \section{Conclusion}
 \label{sec:conclusion}
 
-This work shows how cheaply initialiser-driven \texttt{auto} integrates into a single-pass, AST-free compiler. Initialiser-local deduction is single-pass by nature --- C++ and Go demonstrate as much --- so the contribution is not that it is possible but that in Selfie it is nearly free: the type an \texttt{auto} variable needs is a by-product of code generation the single pass already computes and would otherwise discard, and capturing it in three functions is enough, with no AST, no separate semantic pass, and no change to the code generator. The extended compiler still self-compiles, passes the autograder, and --- when its own source is rewritten to use \texttt{auto} --- still reaches a byte-identical self-self fixpoint. The feature's restrictions are not weaknesses but the precise boundary of what a single pass makes available, and its error cases fall out of Selfie's existing diagnostics for free.
+This work shows how cheaply initialiser-driven \texttt{auto} integrates into a single-pass, AST-free compiler. Initialiser-local deduction is single-pass by nature --- C++ and Go demonstrate as much --- so the contribution is not that it is possible but that in Selfie it is nearly free: the type an \texttt{auto} variable needs is a by-product of code generation the single pass already computes and would otherwise discard, and capturing it in three functions is enough, with no AST, no separate semantic pass, and no change to the code generator. Concretely: \textbf{RQ1}~yes --- deduction adds no AST and no separate pass; \textbf{RQ2}~the type is read back from \texttt{compile\_expression()}'s existing return value and the slot is pushed lazily onto the stack, a change localised to three functions plus one scanner keyword; \textbf{RQ3}~yes --- the compiler still self-compiles and, with its own source \texttt{auto}-ised, still reaches a byte-identical self-self fixpoint. The feature's restrictions are not weaknesses but the precise boundary of what a single pass makes available, and its error cases fall out of Selfie's existing diagnostics for free.
 
 % ── References ────────────────────────────────────────────────────────────────
 \footnotesize
@@ -585,6 +584,11 @@ This work shows how cheaply initialiser-driven \texttt{auto} integrates into a s
   Waterman, A., Asanovi\'{c}, K.\ (eds.).
   \textit{The RISC-V Instruction Set Manual, Volume I: User-Level ISA}.
   RISC-V Foundation, 2019.
+
+\bibitem{tcc}
+  Bellard, F.
+  \textit{TCC: Tiny C Compiler --- Reference Documentation}.
+  \url{https://bellard.org/tcc/}, 2017.
 
 \end{thebibliography}
 
