@@ -109,7 +109,7 @@
 % ── Title ─────────────────────────────────────────────────────────────────────
 \begin{center}
   {\LARGE \textbf{\textcolor{headcolor}{\texttt{auto}: Initialiser-Driven Type Deduction in Selfie}}}\\[0.4cm]
-  {\large Adding type inference to a single-pass C* compiler without an AST}\\[0.6cm]
+  {\large Initialiser-driven type deduction in a single-pass C* compiler without an AST}\\[0.6cm]
   {\normalsize
     Florian Schroffner\\
     \texttt{florian.schroffner@stud.plus.ac.at}\\
@@ -143,7 +143,7 @@ This work extends the Selfie/C* compiler with a single keyword, \texttt{auto}, t
 \subsection{Problem Definition}
 \label{sec:problem}
 
-In C and most C-family languages every local variable is declared with an explicit type, even when that type is obvious from the value it is initialised with. Modern languages remove this redundancy: C++ offers \texttt{auto}, Go provides \texttt{:=}, and the ML family infers types across whole functions. A common assumption is that adding such a feature to a compiler requires a multi-pass pipeline with an explicit AST and a dedicated semantic phase that can reason about types before code generation. Selfie's compiler has neither: it is single-pass and emits machine code as it parses. The problem this work addresses is therefore whether type inference can be added to Selfie \emph{without} abandoning its defining single-pass, AST-free design.
+In C and most C-family languages every local variable is declared with an explicit type, even when that type is obvious from the value it is initialised with. Modern languages remove this redundancy: C++ offers \texttt{auto}, Go provides \texttt{:=}, and the ML family infers types across whole functions. A common assumption is that adding such a feature to a compiler requires a multi-pass pipeline with an explicit AST and a dedicated semantic phase that can reason about types before code generation. Selfie's compiler has neither: it is single-pass and emits machine code as it parses. The problem this work addresses is therefore whether initialiser-driven \texttt{auto} --- a form of type \emph{deduction}, which we distinguish from full type inference in Section~\ref{sec:deduction-vs-inference} --- can be added to Selfie \emph{without} abandoning its defining single-pass, AST-free design.
 
 \subsection{Contribution}
 \label{sec:contribution}
@@ -446,7 +446,7 @@ Selfie reaches a fixpoint over boot levels: the GCC-built \texttt{selfie} (level
 \subsection{Cost per Declaration}
 \label{sec:cost}
 
-Deduction adds no algorithmic cost. Compiling the initialiser is work Selfie performs for any assignment; \texttt{auto} merely keeps the type tag that ordinary compilation discards. Beyond that, an \texttt{auto} declaration performs a constant amount of additional work: one symbol-table insertion and the emission of two instructions (the \texttt{addi} that lowers \texttt{SP} and the \texttt{sd} that stores the initial value). The feature is therefore $O(1)$ per declaration on top of compiling the initialiser, with no global analysis at any point.
+Deduction adds no algorithmic cost. Compiling the initialiser is work Selfie performs for any assignment; \texttt{auto} merely keeps the type tag that ordinary compilation discards. Beyond that, an \texttt{auto} declaration performs a constant amount of additional work: one symbol-table insertion and the emission of two instructions (the \texttt{addi} that lowers \texttt{SP} and the \texttt{sd} that stores the initial value). The feature is therefore $O(1)$ per declaration on top of compiling the initialiser, with no global analysis at any point. Its scope is correspondingly narrow by design: \texttt{auto} applies to local declarations in statement position and deduces one of C*'s two types from a direct initialiser, nothing more.
 
 \subsection{Why No AST or Separate Pass is Needed}
 \label{sec:noast}
@@ -525,12 +525,6 @@ Call whose return type is outside the cast-free set & 24 \\
 \end{table}
 
 The code-size cost of \emph{using} \texttt{auto} is negligible: the baseline (no \texttt{auto} in the source) self-compiles to 43\,624 instructions, the \texttt{auto}-ised source to 43\,672 --- 48 instructions and 192 bytes across the whole compiler ($+0.11\%$), consistent with the constant, two-instruction per-declaration cost of Section~\ref{sec:cost}.
-
-% ══════════════════════════════════════════════════════════════════════════════
-\section{Optimization and Future Work}
-\label{sec:future}
-
-The feature is intentionally minimal, leaving several local extensions open, none of them architectural. (i)~\emph{More to deduce:} \texttt{auto} yields one of only two types because C* has only two; adding a type to Selfie would immediately give it more to deduce, with no change to the deduction mechanism. (ii)~\emph{Targeted diagnostics:} forward and circular \texttt{auto} are reported through the generic undeclared-identifier error, where a dedicated message would help. (iii)~\emph{Wider scope:} extending \texttt{auto} to procedure return types or globals is conceivable, though globals are allocated before any statement is parsed and would need a different allocation strategy than the lazy stack push used here.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Conclusion}
